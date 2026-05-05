@@ -366,7 +366,7 @@ with st.container():
              try:
               st.image(image, use_container_width=True)
                except Exception:
-                st.warning("Bild konnte nicht angezeigt werden")
+              st.warning("Bild konnte nicht angezeigt werden")
         with col_info:
             with st.spinner("🔍 Erkenne Lebensmittel …"):
                 img_tensor = preprocess(image).unsqueeze(0)
