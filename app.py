@@ -361,8 +361,8 @@ with st.container():
     if image:
         col_img, col_info = st.columns([1, 1])
         with col_img:
-if image is not None:
-    st.image(image, use_container_width=True)
+          if image is not None:
+            st.image(image, use_container_width=True)
         with col_info:
             with st.spinner("🔍 Erkenne Lebensmittel …"):
                 img_tensor = preprocess(image).unsqueeze(0)
