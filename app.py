@@ -1,14 +1,13 @@
 import streamlit as st
-import torch
 from PIL import Image
 import pandas as pd
 from datetime import datetime, timedelta
-import clip
 import numpy as np
 import cv2
 import re
 import easyocr
 from supabase.client import create_client
+import tensorflow as tf
 
 # -----------------------------
 # SUPABASE INIT
@@ -170,9 +169,7 @@ div[data-testid="stVerticalBlock"] > div:nth-child(1) .stButton > button:hover {
 .stButton > button[kind="secondary"] {
     background: #ffe3e3 !important;
     color: #fa5252 !important;
-    font-size: 0.8rem !important;   st.image(image, use_container_width=True)
-     except Exception:
-        st.warning(...)
+    font-size: 0.8rem !important;
     padding: 0.2rem 0.6rem !important;
 }
  
@@ -258,42 +255,37 @@ hr {
  
 # -----------------------------
 # MODELS (cached)
+# ── Teachable Machines: keras_model.h5 + labels.txt ins App-Verzeichnis legen ──
 # -----------------------------
 @st.cache_resource
 def load_models():
-    model, preprocess = clip.load("ViT-B/32")
-    return model, preprocess
- 
-model, preprocess = load_models()
- 
+    model = tf.keras.models.load_model("keras_model.h5", compile=False)
+    with open("labels.txt", "r", encoding="utf-8") as f:
+        # Teachable Machines schreibt "0 Apfel", "1 Banane" — wir nehmen nur den Namen
+        class_names = [line.strip().split(" ", 1)[-1] for line in f.readlines()]
+    return model, class_names
+
+model, labels = load_models()
+
 @st.cache_resource
 def load_ocr():
     return easyocr.Reader(['de', 'en'])
  
 ocr = load_ocr()
- 
+
 # -----------------------------
-# LABELS
+# CLASSIFY (Teachable Machines)
+# ── Eingabe: PIL Image → Label-String ──
 # -----------------------------
-labels = [
-    "ein Apfel","eine Banane","eine Orange","eine Birne","eine Erdbeere",
-    "eine Traube","eine Zitrone","eine Limette","eine Mango","eine Ananas",
-    "eine Wassermelone","eine Kirsche","ein Pfirsich","eine Nektarine",
-    "eine Heidelbeere","eine Himbeere","eine Brombeere","eine Kiwi",
-    "eine Granatapfel","eine Grapefruit","eine Papaya",
-    "eine Tomate","eine Gurke","eine Paprika","eine Karotte","eine Kartoffel",
-    "eine Zwiebel","ein Knoblauch","ein Brokkoli","ein Blumenkohl","ein Salatkopf",
-    "eine Zucchini","eine Aubergine","ein Spinat","eine Avocado","ein Pilz",
-    "ein Käse","eine Milchpackung","ein Joghurt","ein Quark","ein Frischkäse",
-    "ein Stück Butter","eine Sahne","ein Pudding",
-    "ein Hähnchen","ein Rindfleisch","ein Schweinefleisch","ein Fischfilet",
-    "eine Wurst","ein Schinken","eine Salami",
-    "ein Brot","ein Brötchen","eine Pizza","ein Croissant","ein Sandwich",
-    "eine Schokolade","ein Keks","eine Packung Chips","ein Eis","eine Cola"
-]
- 
-text_tokens = clip.tokenize(labels)
- 
+def classify_image(image):
+    img = image.convert("RGB").resize((224, 224))
+    arr = np.array(img, dtype=np.float32)
+    arr = (arr / 127.5) - 1.0        # Teachable Machines Normalisierung
+    arr = np.expand_dims(arr, axis=0) # (1, 224, 224, 3)
+    predictions = model.predict(arr)
+    index = np.argmax(predictions[0])
+    return labels[index]
+
 # -----------------------------
 # SESSION STATE
 # -----------------------------
@@ -378,13 +370,8 @@ with st.container():
 
         with col_info:
             with st.spinner("🔍 Erkenne Lebensmittel …"):
-                img_tensor = preprocess(image).unsqueeze(0)
-
-                with torch.no_grad():
-                    logits, _ = model(img_tensor, text_tokens)
-                    probs = logits.softmax(dim=-1).cpu().numpy()[0]
-
-            st.session_state.food_item = labels[probs.argmax()]
+                # ── GEÄNDERT: Teachable Machines statt CLIP ──
+                st.session_state.food_item = classify_image(image)
 
             st.markdown("**Erkannt:**")
             st.markdown(
