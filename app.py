@@ -8,8 +8,8 @@ import numpy as np
 import cv2
 import re
 import easyocr
-from supabase import create_client
- 
+from supabase.client import create_client
+
 # -----------------------------
 # SUPABASE INIT
 # -----------------------------
