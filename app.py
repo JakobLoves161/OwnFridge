@@ -364,7 +364,7 @@ with st.container():
           if image is not None:
             if image is not None:
              try:
-        st.image(image, use_container_width=True)
+              st.image(image, use_container_width=True)
     except Exception:
         st.warning("Bild konnte nicht angezeigt werden")
         with col_info:
