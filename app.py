@@ -256,13 +256,14 @@ hr {
 # -----------------------------
 # MODELS (cached)
 # ── Teachable Machines: keras_model.h5 + labels.txt ins App-Verzeichnis legen ──
+# ── Modell: Input 224x224x3, Output 6 Klassen (Softmax) ──
 # -----------------------------
 @st.cache_resource
 def load_models():
     model = tf.keras.models.load_model("keras_model.h5", compile=False)
     with open("labels.txt", "r", encoding="utf-8") as f:
-        # Teachable Machines schreibt "0 Apfel", "1 Banane" — wir nehmen nur den Namen
-        class_names = [line.strip().split(" ", 1)[-1] for line in f.readlines()]
+        # Teachable Machines schreibt "0 Gurke", "1 Paprika" — wir nehmen nur den Namen
+        class_names = [line.strip().split(" ", 1)[-1] for line in f.readlines() if line.strip()]
     return model, class_names
 
 model, labels = load_models()
@@ -275,15 +276,21 @@ ocr = load_ocr()
 
 # -----------------------------
 # CLASSIFY (Teachable Machines)
-# ── Eingabe: PIL Image → Label-String ──
+# ── Input 224x224, Normalisierung: (x / 127.5) - 1  (Standard TM) ──
+# ── Schwellwert 70%: darunter → None (verhindert falsche Labels) ──
 # -----------------------------
+CONFIDENCE_THRESHOLD = 0.70
+
 def classify_image(image):
     img = image.convert("RGB").resize((224, 224))
     arr = np.array(img, dtype=np.float32)
-    arr = (arr / 127.5) - 1.0        # Teachable Machines Normalisierung
-    arr = np.expand_dims(arr, axis=0) # (1, 224, 224, 3)
-    predictions = model.predict(arr)
-    index = np.argmax(predictions[0])
+    arr = (arr / 127.5) - 1.0         # Teachable Machines Normalisierung
+    arr = np.expand_dims(arr, axis=0)  # → (1, 224, 224, 3)
+    predictions = model.predict(arr, verbose=0)
+    index = int(np.argmax(predictions[0]))
+    confidence = float(predictions[0][index])
+    if confidence < CONFIDENCE_THRESHOLD:
+        return None                    # zu unsicher → kein Label ausgeben
     return labels[index]
 
 # -----------------------------
@@ -370,14 +377,17 @@ with st.container():
 
         with col_info:
             with st.spinner("🔍 Erkenne Lebensmittel …"):
-                # ── GEÄNDERT: Teachable Machines statt CLIP ──
-                st.session_state.food_item = classify_image(image)
+                result = classify_image(image)
 
-            st.markdown("**Erkannt:**")
-            st.markdown(
-                f"<div class='food-pill'>✅ {st.session_state.food_item}</div>",
-                unsafe_allow_html=True
-            )
+            if result is None:
+                st.warning("⚠️ Nicht erkannt. Bitte nochmal versuchen oder manuell eingeben.")
+            else:
+                st.session_state.food_item = result
+                st.markdown("**Erkannt:**")
+                st.markdown(
+                    f"<div class='food-pill'>✅ {st.session_state.food_item}</div>",
+                    unsafe_allow_html=True
+                )
 
     elif st.session_state.food_item:
         st.markdown(
