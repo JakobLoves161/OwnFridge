@@ -170,7 +170,9 @@ div[data-testid="stVerticalBlock"] > div:nth-child(1) .stButton > button:hover {
 .stButton > button[kind="secondary"] {
     background: #ffe3e3 !important;
     color: #fa5252 !important;
-    font-size: 0.8rem !important;
+    font-size: 0.8rem !important;   st.image(image, use_container_width=True)
+     except Exception:
+        st.warning(...)
     padding: 0.2rem 0.6rem !important;
 }
  
@@ -339,47 +341,63 @@ st.markdown("<div class='subtitle-banner'>Dein intelligenter Lebensmittel-Assist
 # -----------------------------
 with st.container():
     st.markdown("### 🍎 Lebensmittel erkennen")
- 
+
     food_tab1, food_tab2, food_tab3 = st.tabs(["📷 Kamera", "📁 Upload", "✏️ Manuell"])
     image = None
- 
+
     with food_tab1:
         cam = st.camera_input("Foto aufnehmen")
         if cam:
-            image = Image.open(cam)
- 
+            image = Image.open(cam).convert("RGB")
+
     with food_tab2:
         up = st.file_uploader("Bild hochladen", type=["jpg", "png"])
         if up:
-            image = Image.open(up)
- 
+            image = Image.open(up).convert("RGB")
+
     with food_tab3:
-        manual_food = st.text_input("Lebensmittel eingeben", placeholder="z. B. Joghurt, Milch …")
+        manual_food = st.text_input(
+            "Lebensmittel eingeben",
+            placeholder="z. B. Joghurt, Milch …"
+        )
         if manual_food:
             st.session_state.food_item = manual_food
- 
-    if image:
+
+    # -----------------------------
+    # IMAGE DISPLAY + PREDICTION
+    # -----------------------------
+    if image is not None:
+
         col_img, col_info = st.columns([1, 1])
+
         with col_img:
-          if image is not None:
-            if image is not None:
-             try:
-              st.image(image, use_container_width=True)
-               except Exception:
-              st.warning("Bild konnte nicht angezeigt werden")
+            try:
+                st.image(image, use_container_width=True)
+            except Exception:
+                st.warning("Bild konnte nicht angezeigt werden")
+
         with col_info:
             with st.spinner("🔍 Erkenne Lebensmittel …"):
                 img_tensor = preprocess(image).unsqueeze(0)
+
                 with torch.no_grad():
                     logits, _ = model(img_tensor, text_tokens)
                     probs = logits.softmax(dim=-1).cpu().numpy()[0]
+
             st.session_state.food_item = labels[probs.argmax()]
+
             st.markdown("**Erkannt:**")
-            st.markdown(f"<div class='food-pill'>✅ {st.session_state.food_item}</div>", unsafe_allow_html=True)
- 
+            st.markdown(
+                f"<div class='food-pill'>✅ {st.session_state.food_item}</div>",
+                unsafe_allow_html=True
+            )
+
     elif st.session_state.food_item:
-        st.markdown(f"<div class='food-pill'>✅ {st.session_state.food_item}</div>", unsafe_allow_html=True)
- 
+        st.markdown(
+            f"<div class='food-pill'>✅ {st.session_state.food_item}</div>",
+            unsafe_allow_html=True
+        )
+
 st.markdown("<hr>", unsafe_allow_html=True)
  
 # -----------------------------
