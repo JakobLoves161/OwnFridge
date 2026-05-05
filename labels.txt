@@ -1,0 +1,6 @@
+0 Gurke
+1 Lauch
+2 Paprika
+3 Milch
+4 Käse
+5 Karotte
